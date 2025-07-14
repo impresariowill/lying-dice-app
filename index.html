@@ -1,0 +1,299 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+	<meta name="viewport" content="width=device-width, initial-scale=1" >
+	<meta http-equiv="content-type" content="text/html;charset=utf-8">
+</head>
+<body>
+<script>
+class Dice {
+	//static diceheight = '10vh';
+	static click () {
+		if (RollArea.getInstance().state == false) return;
+		let ctrl = this;
+		if (OpenArea.getInstance().getDiceIndex(ctrl) != null) {
+			OpenArea.getInstance().removeDice(ctrl);
+			RollArea.getInstance().addDice(ctrl);
+		} else if (RollArea.getInstance().getDiceIndex(ctrl) != null) {
+			RollArea.getInstance().removeDice(ctrl);
+			OpenArea.getInstance().addDice(ctrl);
+		}
+	}
+	static getDiceDim (mul) {
+		let m = Dice.diceheight.match(/^(\d+)([a-z]+)$/);
+		m[1] *= mul;
+		return m[1]+m[2];
+	}
+	constructor () {
+		let img = document.createElement('img'), span = document.createElement('span');
+		this.element = document.createElement('div');
+		this.imgelement = img;
+		this.spanelement = span;
+		this.element.appendChild(img);
+		this.element.appendChild(span);
+		this.element.controlobject = this;
+		this.element.style.width = Dice.diceheight;
+		this.element.style.height = Dice.diceheight;
+		this.element.style.cursor = 'pointer';
+		this.clickaction = Dice.click.bind(this);
+		this.element.addEventListener ('click', this.clickaction);
+		this.num = 1;
+	}
+	roll() {
+		let x = Dice.getMaxNum();
+		this.num = Math.floor(Math.random() * x)+1;
+		this.render();
+	}
+	render() {
+		if (Dice.getMaxNum() <= 6 && this.num <= 6) {
+			this.element.className = 'dice';
+			this.imgelement.src = (this.num)+'a.png';
+		} else {
+			this.element.className = 'dice num';
+			this.spanelement.innerHTML = this.num;
+		}
+	}
+}
+Dice.diceheight = '10vh';
+Dice.getMaxNum = function() {
+	let x = document.getElementById('maxnum').value;
+	if (x && x.match(/^[1-9]\d?$/)) x *= 1; else x = 6;
+	return x;
+}
+class Area {
+	getDiceIndex (dice) {
+		let idx = null;
+		for (let i = 0; i < this.dices.length; i++) if (this.dices[i] == dice) {idx = i; break;}
+		return idx;
+	}
+	addDice (dice) {
+		let idx = this.getDiceIndex(dice);
+		if (idx != null) return idx;
+		for (let i = 0; true; i++) {
+			if (!this.dices[i]) {this.dices[i] = dice; idx = i; break;}
+		}
+		this.displayDice (dice);
+		return idx;
+	}
+
+}
+
+
+class OpenArea extends Area {
+	constructor () {
+		super();		
+		this.dices = [];
+		this.element = document.getElementById('openarea');
+	}
+
+	displayDice (dice) {
+		var idx = this.getDiceIndex(dice);
+		if (idx == null) return;
+		if (dice.element.parentNode != this.element) this.element.appendChild (dice.element);
+		dice.element.style.position = '';
+		dice.element.style.marginTop = '1vh';
+		dice.element.style.marginLeft = '1vh';
+		dice.render();
+	}
+	removeDice (dice) {
+		let idx;
+		if (dice == null && this.dices.length > 0) dice = this.dices[this.dices.length -1];
+		idx = this.getDiceIndex(dice);
+		if (idx == null) return;
+		let d = this.dices[idx];
+		this.dices.splice(idx,1);
+		if (d.element.parentNode == this.element) this.element.removeChild(d.element);
+		return d;
+	}	
+
+	//static instance;
+	static getInstance () {
+		if (!OpenArea.instance) OpenArea.instance = new OpenArea;
+		return OpenArea.instance;
+	}
+}
+class RollArea extends Area {
+	constructor () {
+		super();
+		this.dices = [];
+		this.state = true;
+		this.positions = [
+			[40, 50],
+			[60, 50],
+			[50, 70],
+			[50, 30],
+			[70, 30],
+			[30, 70],
+			[30, 30]
+		];
+		this.coverstart = null;
+		this.covermoved = false;
+		this.element = document.getElementById('rollarea');
+		this.elementCover = document.getElementById('rollcover');
+	}
+	click() {
+		if (!this.state && !this.covermoved) this.reveal();
+	}
+	getCount () {
+		let c =0;
+		for (let i = 0; i < this.dices.length; i++) {
+			if (this.dices[i]) c++;
+		}
+		return c;
+	}
+	displayDice (dice) {
+		var idx = this.getDiceIndex(dice);
+		if (idx == null) return;
+		if (dice.element.parentNode != this.element) this.element.appendChild (dice.element);
+		let pos = this.positions[idx];
+		if (!pos) return;
+		dice.element.style.position = 'absolute';
+		dice.element.style.left = pos[0] + '%';
+		dice.element.style.top = pos[1] + '%';
+		dice.element.style.marginLeft = Dice.getDiceDim(-0.5);
+		dice.element.style.marginTop = Dice.getDiceDim(-0.5);
+		dice.render();
+	}
+	removeDice (dice) {
+		let idx;
+		idx = this.getDiceIndex(dice);
+		if (idx == null) return;
+		let d = this.dices[idx];
+		this.dices[idx] = null;
+		if (d.element.parentNode == this.element) this.element.removeChild(d.element);
+		return d;
+	}
+	rollDices() {
+		if (this.state == false || this.getCount() == 0) return;
+		this.element.className = 'closed';
+		this.state = false;
+		for (let i = 0; i < this.dices.length; i++) {
+			if (this.dices[i]) this.dices[i].roll();
+		}
+		document.getElementById('rollbtn').style.display = 'none';
+		document.getElementById('rollsound').play();
+		this.covermoved = false;
+	}
+	reveal() {
+		this.element.className = '';
+		this.state = true;
+		document.getElementById('rollbtn').style.display = '';
+		this.covermoved = false;
+	}
+	moveCover (state, coord) {
+		if (state == 'start' && this.state == false && !this.coverstart) {
+			this.coverstart = coord;
+			this.elementCover.style.top = '0';
+			this.elementCover.style.left = '0';
+			this.covermoved = false;
+		} else if (state == 'move' && this.state == false && this.coverstart) {
+			this.elementCover.style.left = (coord[0] - this.coverstart[0])+'px';
+			this.elementCover.style.top = (coord[1] - this.coverstart[1])+'px';
+			this.covermoved = true;
+		} else if (state == 'end') {
+			this.coverstart = null;
+			this.elementCover.style.top = '0';
+			this.elementCover.style.left = '0';
+		}
+	}
+
+	//static instance;
+	static getInstance () {
+		if (!RollArea.instance) RollArea.instance = new RollArea;
+		return RollArea.instance;
+	}	
+
+}
+
+</script>
+<style>
+#openarea {position:absolute;top:1vh;left:1vh;right:14vh;padding-right:1vh;padding-bottom:1vh;min-height:10vh;background:#cccccc88;display:flex;flex-wrap:wrap;align-items:flex-start;align-content:flex-start;}
+#rollarea {position:absolute;top:60%;left:50%;margin-top:-25vh;margin-left:-25vh;height:50vh;width:50vh;border-radius:50%;border:double 3px black;background:#999999;}
+#rollarea #rollcover {display:none;}
+#rollarea.closed #rollcover {display:block;width:100%;height:100%;position:absolute;z-index:10;background:#333333;cursor:pointer;font-size:20vh;color:white;text-align:center;line-height:40vh;border-radius:50%;border:solid 1px black;}
+#rollcover::before {content:"✋";display:inline;}
+body {background:#eeffee;font-family:Arial;overflow:hidden;}
+#btnarea {display:block;position:absolute;right:1vh;top:1vh;}
+#addbtn {border-radius:30%;border:solid 2px black;background:#ffffcc;cursor:pointer;width:10vh;height:10vh;text-align:center;line-height:10vh;margin-right:1vh;margin-bottom:1vh;}
+#addbtn::before {content:"+";display:inline;font-size:10vh;}
+#removebtn {border-radius:30%;border:solid 2px black;background:#ccccff;cursor:pointer;width:10vh;height:10vh;text-align:center;line-height:10vh;margin-bottom:1vh;}
+#removebtn::before {content:"-";display:inline;font-size:10vh;}
+#allinbtn {border-radius:30%;border:solid 2px black;background:#ffcccc;cursor:pointer;width:10vh;height:10vh;text-align:center;line-height:10vh;}
+#allinbtn::before {content:"↓";display:inline;font-size:10vh;}
+#rollbtn {position:absolute;bottom:1vh;right:1vh;width:10vh;height:10vh;background:#9999cc;border-radius:20%;border:solid 2px black;text-align:center;cursor:pointer;}
+#rollbtn::before {content:"↺";display:inline;font-size:10vh;line-height:10vh;}
+#maxnum {display:block;position:absolute;left:1vh;bottom:1vh;width:20%;height:10vh;border:0;font-size:5vh;background:none;}
+.dice {box-sizing: border-box}
+.dice img {width:100%;height:100%;}
+.dice span {display:none;}
+.dice.num {padding:4px;}
+.dice.num img {display:none;}
+.dice.num span {background:white;color:black;font-size:6vh;display:flex;border-radius:20%;border:solid 2px #333333;width:100%;height:100%;text-align:center;align-items: center;justify-content: center;}
+</style>
+<audio controls  id='rollsound' style='display:none'>
+  <source src="rolldice.mp3" type="audio/mpeg">
+</audio>
+<div id="openarea"></div>
+ 
+<div id="rollarea"><div id="rollcover"></div></div>
+
+<div id="rollbtn">
+</div>
+ 
+
+<div id="btnarea">
+	<div id="addbtn"></div>
+	<div id="removebtn"></div>
+	<div id="allinbtn"></div>
+</div>
+<input type="number" min="1" max="99" step="1" id="maxnum" placeholder="" />
+
+<script>
+var f;
+document.getElementById('addbtn').addEventListener('click',f=function() {
+	if (OpenArea.getInstance().dices.length + RollArea.getInstance().getCount() >= 7) return;
+	var d = new Dice();
+	OpenArea.getInstance().addDice(d);
+});
+document.getElementById('removebtn').addEventListener('click',function() {
+	OpenArea.getInstance().removeDice();
+});
+document.getElementById('rollbtn').addEventListener('click',function() {
+	RollArea.getInstance().rollDices();
+});
+function coverevent (en, e) {
+	let e1;
+	if (e.targetTouches && e.targetTouches[0]) e1 = e.targetTouches[0];
+	else e1 = e;
+	RollArea.getInstance().moveCover(en, [e1.screenX || e1.clientX || e1.offsetX, e1.screenY || e1.clientY || e1.offsetY]);
+}
+document.getElementById('rollcover').addEventListener('mousedown',function(e) {
+	coverevent('start',e);
+});
+document.getElementById('rollcover').addEventListener('touchstart',function(e) {
+	coverevent('start',e);
+});
+document.getElementById('rollcover').addEventListener('mousemove',function(e) {
+	coverevent('move',e);
+});
+document.getElementById('rollcover').addEventListener('touchmove',function(e) {
+	coverevent('move',e);
+});
+document.getElementById('rollcover').addEventListener('mouseup',function(e) {
+	coverevent('end',e);
+});
+document.getElementById('rollcover').addEventListener('touchend',function(e) {
+	coverevent('end',e);
+});
+document.getElementById('rollarea').addEventListener('click',function() {
+	RollArea.getInstance().click();
+});
+document.getElementById('allinbtn').addEventListener('click',function() {
+	if (RollArea.getInstance().state == false) return;
+	let o = OpenArea.getInstance();
+	while (o.dices[0]) o.dices[0].clickaction();
+	RollArea.getInstance().click();
+});
+for (let i = 0; i < 5; i++) f();
+</script>
+</body>
